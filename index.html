@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="일정관리">
+<meta name="application-name" content="서구 일정관리">
+<meta name="description" content="오늘의 할일과 사업별 마감일을 관리하는 일정관리 앱">
+<link rel="icon" type="image/png" href="./icon.png">
+<link rel="apple-touch-icon" href="./icon.png">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0F1B2D">
+<title>서구 일정관리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Gowun+Batang:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0F1B2D;        /* 진청 잉크 */
+  --paper:#F7F5F0;      /* 한지빛 배경 */
+  --card:#FFFFFF;
+  --line:#E4E0D6;
+  --accent:#C8401A;     /* 도장 주홍 */
+  --accent-soft:#FBEAE3;
+  --done:#5E8C61;       /* 완료 초록 */
+  --done-soft:#EAF2EA;
+  --muted:#8A8678;
+  --danger:#C8401A;
+  --radius:14px;
+  --shadow:0 1px 3px rgba(15,27,45,.08), 0 4px 14px rgba(15,27,45,.05);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:'IBM Plex Sans KR',-apple-system,sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  font-size:15px;
+  line-height:1.5;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+/* ===== 헤더 ===== */
+header{
+  background:var(--ink);
+  color:#F7F5F0;
+  padding:calc(18px + env(safe-area-inset-top)) 20px 16px;
+  position:sticky;top:0;z-index:50;
+}
+.head-row{display:flex;align-items:baseline;justify-content:space-between;max-width:880px;margin:0 auto;}
+h1{
+  font-family:'Gowun Batang',serif;
+  font-size:21px;font-weight:700;letter-spacing:-.3px;
+}
+h1 .stamp{
+  display:inline-block;
+  color:var(--accent);
+  transform:rotate(-3deg);
+  margin-right:2px;
+}
+.today{font-size:12.5px;color:#A8B3C4;font-weight:500}
+.sync{font-size:11px;color:#6F7E94;margin-top:3px;max-width:880px;margin-left:auto;margin-right:auto;display:flex;align-items:center;gap:5px}
+.sync .dot{width:6px;height:6px;border-radius:50%;background:#5E8C61;display:inline-block}
+.sync.offline .dot{background:#C8401A}
+/* ===== 필터 바 ===== */
+.filterbar{
+  position:sticky;top:0;z-index:40;
+  background:var(--paper);
+  border-bottom:1px solid var(--line);
+  padding:10px 16px;
+}
+.filter-inner{max-width:880px;margin:0 auto;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}
+.filter-inner::-webkit-scrollbar{display:none}
+.chip{
+  flex-shrink:0;
+  border:1px solid var(--line);
+  background:var(--card);
+  border-radius:999px;
+  padding:6px 14px;
+  font-size:13px;font-weight:500;
+  color:var(--muted);
+  cursor:pointer;
+  font-family:inherit;
+  transition:all .15s;
+}
+.chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.chip .n{font-size:11.5px;opacity:.75;margin-left:3px}
+/* ===== 메인 ===== */
+main{max-width:880px;margin:0 auto;padding:16px 16px 120px}
+.section-label{
+  font-size:12px;font-weight:600;letter-spacing:.08em;
+  color:var(--muted);text-transform:uppercase;
+  margin:22px 4px 10px;
+  display:flex;align-items:center;gap:8px;
+}
+.section-label::after{content:'';flex:1;height:1px;background:var(--line)}
+.section-label:first-child{margin-top:4px}
+/* ===== 카드 ===== */
+.task{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:14px 14px 12px;
+  margin-bottom:10px;
+  box-shadow:var(--shadow);
+  display:flex;gap:12px;align-items:flex-start;
+  transition:opacity .2s, transform .2s;
+}
+.task.removing{opacity:0;transform:translateX(30px)}
+.task.overdue{border-left:4px solid var(--accent)}
+.task.dtoday{border-left:4px solid #D99A2B}
+.check{
+  flex-shrink:0;margin-top:2px;
+  width:24px;height:24px;border-radius:8px;
+  border:2px solid #C9C4B6;background:#fff;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.check svg{opacity:0;transition:opacity .15s}
+.task.is-done .check{background:var(--done);border-color:var(--done)}
+.task.is-done .check svg{opacity:1}
+.task-body{flex:1;min-width:0}
+.task-title{font-size:15.5px;font-weight:600;word-break:keep-all}
+.task.is-done .task-title{color:var(--muted);text-decoration:line-through;text-decoration-color:#C9C4B6}
+.task-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;align-items:center}
+.tag{
+  font-size:11.5px;font-weight:600;
+  padding:3px 9px;border-radius:6px;
+  background:#EFEDE6;color:#6E6A5C;
+}
+.tag.due{background:var(--accent-soft);color:var(--accent)}
+.tag.due.today{background:#FBF3E1;color:#A06A00}
+.tag.due.future{background:#E9EEF5;color:#3D5A80}
+.tag.donewhen{background:var(--done-soft);color:var(--done)}
+.task-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.icon-btn{
+  width:32px;height:32px;border-radius:9px;
+  border:1px solid var(--line);background:#FAFAF7;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--muted);transition:all .15s;
+}
+.icon-btn:active{transform:scale(.92)}
+.icon-btn.del:hover{color:var(--danger);border-color:var(--danger)}
+/* 빈 상태 */
+.empty{
+  text-align:center;padding:60px 20px;color:var(--muted);
+}
+.empty .big{font-family:'Gowun Batang',serif;font-size:19px;color:var(--ink);margin-bottom:8px}
+/* ===== FAB ===== */
+.fab{
+  position:fixed;right:20px;bottom:calc(24px + env(safe-area-inset-bottom));
+  width:58px;height:58px;border-radius:50%;
+  background:var(--accent);color:#fff;border:none;
+  font-size:28px;line-height:1;cursor:pointer;
+  box-shadow:0 6px 20px rgba(200,64,26,.4);
+  display:flex;align-items:center;justify-content:center;
+  z-index:60;transition:transform .15s;
+}
+.fab:active{transform:scale(.9)}
+/* ===== 모달 ===== */
+.overlay{
+  position:fixed;inset:0;background:rgba(15,27,45,.45);
+  z-index:100;display:none;align-items:flex-end;justify-content:center;
+  backdrop-filter:blur(2px);
+}
+.overlay.show{display:flex}
+.sheet{
+  background:var(--card);width:100%;max-width:560px;
+  border-radius:22px 22px 0 0;
+  padding:22px 20px calc(26px + env(safe-area-inset-bottom));
+  animation:up .22s ease-out;
+}
+@keyframes up{from{transform:translateY(40px);opacity:.5}to{transform:translateY(0);opacity:1}}
+@media(min-width:600px){
+  .overlay{align-items:center}
+  .sheet{border-radius:22px;margin:0 16px}
+}
+.sheet h2{font-family:'Gowun Batang',serif;font-size:18px;margin-bottom:18px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px}
+.field input,.field select{
+  width:100%;border:1.5px solid var(--line);border-radius:11px;
+  padding:12px 13px;font-size:15px;font-family:inherit;
+  background:#FCFBF8;color:var(--ink);outline:none;
+  transition:border-color .15s;
+  appearance:none;-webkit-appearance:none;
+}
+.field input:focus,.field select:focus{border-color:var(--ink)}
+.field-row{display:flex;gap:10px}
+.field-row .field{flex:1}
+.proj-wrap{display:flex;gap:8px}
+.proj-wrap select{flex:1}
+.proj-wrap input{flex:1;display:none}
+.proj-wrap.newmode select{display:none}
+.proj-wrap.newmode input{display:block}
+.mini-btn{
+  flex-shrink:0;border:1.5px solid var(--line);background:#FCFBF8;
+  border-radius:11px;padding:0 14px;font-size:13px;font-weight:600;
+  color:var(--muted);cursor:pointer;font-family:inherit;
+}
+.sheet-btns{display:flex;gap:10px;margin-top:20px}
+.btn{
+  flex:1;border:none;border-radius:12px;padding:14px;
+  font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;
+  transition:transform .1s;
+}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.ghost{background:#EFEDE6;color:var(--ink)}
+/* 토스트 */
+.toast{
+  position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  background:var(--ink);color:#fff;
+  padding:11px 20px;border-radius:999px;
+  font-size:13.5px;font-weight:500;z-index:200;
+  opacity:0;pointer-events:none;transition:opacity .25s;
+  white-space:nowrap;
+}
+.toast.show{opacity:1}
+/* 로딩 */
+.loading{text-align:center;padding:70px 0;color:var(--muted);font-size:14px}
+.spinner{
+  width:26px;height:26px;border:3px solid var(--line);
+  border-top-color:var(--accent);border-radius:50%;
+  margin:0 auto 12px;animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-row">
+    <h1><span class="stamp">■</span> 일정관리</h1>
+    <span class="today" id="todayLabel"></span>
+  </div>
+  <div class="sync" id="syncState"><span class="dot"></span><span id="syncText">연결 중…</span></div>
+</header>
+
+<div class="filterbar">
+  <div class="filter-inner" id="filterBar">
+    <button class="chip on" data-proj="__all">전체</button>
+  </div>
+</div>
+
+<main>
+  <div id="listArea">
+    <div class="loading"><div class="spinner"></div>불러오는 중</div>
+  </div>
+</main>
+
+<button class="fab" id="fabBtn" aria-label="할일 추가">＋</button>
+
+<!-- 추가/수정 시트 -->
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <h2 id="sheetTitle">할일 추가</h2>
+    <div class="field">
+      <label>할 일</label>
+      <input type="text" id="inTitle" placeholder="예) 의회 보고전 초안 작성" maxlength="120" autocomplete="off">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>마감일</label>
+        <input type="date" id="inDate">
+      </div>
+      <div class="field">
+        <label>마감시간 (선택)</label>
+        <input type="time" id="inTime">
+      </div>
+    </div>
+    <div class="field">
+      <label>사업 분류</label>
+      <div class="proj-wrap" id="projWrap">
+        <select id="inProjSel"></select>
+        <input type="text" id="inProjNew" placeholder="새 사업명 입력" maxlength="30">
+        <button class="mini-btn" id="projToggle" type="button">＋새 사업</button>
+      </div>
+    </div>
+    <div class="sheet-btns">
+      <button class="btn ghost" id="btnCancel" type="button">취소</button>
+      <button class="btn primary" id="btnSave" type="button">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, updateDoc, deleteDoc, doc,
+  onSnapshot, query, serverTimestamp, Timestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCVqWRnBMtQFUU51xzukqVEnFts-VqEnhA",
+  authDomain: "seogu-bapsang.firebaseapp.com",
+  projectId: "seogu-bapsang",
+  storageBucket: "seogu-bapsang.firebasestorage.app",
+  messagingSenderId: "335336990084",
+  appId: "1:335336990084:web:899e3f4d3532ac4e2329d1"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+const COL = collection(db, "tasks");
+
+/* ===== 상태 ===== */
+let tasks = [];
+let curFilter = "__all";
+let editingId = null;
+
+/* ===== 유틸 ===== */
+const $ = s => document.querySelector(s);
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
+const fmtDate = (s) => {
+  if(!s) return "";
+  const [y,m,d] = s.split("-").map(Number);
+  const dt = new Date(y, m-1, d);
+  const wd = ["일","월","화","수","목","금","토"][dt.getDay()];
+  return `${m}/${d}(${wd})`;
+};
+const dDay = (s) => {
+  if(!s) return null;
+  const t = new Date(todayStr()+"T00:00:00");
+  const d = new Date(s+"T00:00:00");
+  return Math.round((d - t) / 86400000);
+};
+const toast = (msg) => {
+  const el = $("#toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove("show"), 2200);
+};
+
+/* 오늘 날짜 표시 */
+(()=>{
+  const d = new Date();
+  const wd = ["일","월","화","수","목","금","토"][d.getDay()];
+  $("#todayLabel").textContent = `${d.getMonth()+1}월 ${d.getDate()}일 (${wd})`;
+})();
+
+/* ===== 실시간 구독 ===== */
+onSnapshot(query(COL), snap => {
+  tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  $("#syncText").textContent = "실시간 동기화 중";
+  $("#syncState").classList.remove("offline");
+  autoCleanup();
+  renderFilters();
+  render();
+}, err => {
+  console.error(err);
+  $("#syncText").textContent = "연결 끊김 — 새로고침 해보세요";
+  $("#syncState").classList.add("offline");
+});
+
+/* ===== 완료 후 7일 자동 삭제 ===== */
+let cleaned = false;
+async function autoCleanup(){
+  if(cleaned) return;
+  cleaned = true;
+  const cutoff = Date.now() - 7*86400000;
+  const olds = tasks.filter(t => t.done && t.doneAt && t.doneAt.toMillis() < cutoff);
+  for(const t of olds){
+    try{ await deleteDoc(doc(db,"tasks",t.id)); }catch(e){}
+  }
+  if(olds.length) toast(`완료 후 일주일 지난 ${olds.length}건 정리 완료`);
+}
+
+/* ===== 필터 칩 ===== */
+function renderFilters(){
+  const projs = [...new Set(tasks.map(t => t.project).filter(Boolean))].sort();
+  const bar = $("#filterBar");
+  const counts = {};
+  tasks.forEach(t => { if(!t.done) counts[t.project] = (counts[t.project]||0)+1; });
+  const activeTotal = tasks.filter(t=>!t.done).length;
+
+  let html = `<button class="chip ${curFilter==='__all'?'on':''}" data-proj="__all">전체<span class="n">${activeTotal}</span></button>`;
+  projs.forEach(p => {
+    html += `<button class="chip ${curFilter===p?'on':''}" data-proj="${esc(p)}">${esc(p)}<span class="n">${counts[p]||0}</span></button>`;
+  });
+  bar.innerHTML = html;
+  bar.querySelectorAll(".chip").forEach(c => {
+    c.onclick = () => { curFilter = c.dataset.proj; renderFilters(); render(); };
+  });
+  // 사업 select 갱신
+  const sel = $("#inProjSel");
+  sel.innerHTML = projs.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join("") || `<option value="">사업 없음 — 새로 추가하세요</option>`;
+}
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ===== 렌더 ===== */
+function render(){
+  const area = $("#listArea");
+  let list = tasks.filter(t => curFilter==="__all" || t.project===curFilter);
+
+  // 정렬: 마감일+시간 오름차순, 마감 없는 건 뒤로
+  const sortKey = t => {
+    if(!t.dueDate) return "9999-99-99T99:99";
+    return t.dueDate + "T" + (t.dueTime || "23:59");
+  };
+  const active = list.filter(t=>!t.done).sort((a,b)=> sortKey(a) < sortKey(b) ? -1 : 1);
+  const done   = list.filter(t=> t.done).sort((a,b)=>{
+    const am = a.doneAt?.toMillis?.() || 0, bm = b.doneAt?.toMillis?.() || 0;
+    return bm - am;
+  });
+
+  if(!active.length && !done.length){
+    area.innerHTML = `<div class="empty"><div class="big">할 일이 없습니다</div>오른쪽 아래 ＋ 버튼으로 추가하세요</div>`;
+    return;
+  }
+
+  let html = "";
+  if(active.length){
+    html += `<div class="section-label">진행 중 · ${active.length}건</div>`;
+    html += active.map(cardHTML).join("");
+  }
+  if(done.length){
+    html += `<div class="section-label">달성 · ${done.length}건 <span style="font-weight:400;letter-spacing:0;text-transform:none">(완료 일주일 후 자동 삭제)</span></div>`;
+    html += done.map(cardHTML).join("");
+  }
+  area.innerHTML = html;
+
+  area.querySelectorAll(".task").forEach(el => {
+    const id = el.dataset.id;
+    el.querySelector(".check").onclick = () => toggleDone(id, el);
+    el.querySelector(".del").onclick = () => removeTask(id, el);
+    el.querySelector(".edit").onclick = () => openSheet(id);
+  });
+}
+
+function cardHTML(t){
+  const dd = dDay(t.dueDate);
+  let dueTag = "";
+  let stateCls = "";
+  if(t.dueDate && !t.done){
+    if(dd < 0){ dueTag = `<span class="tag due">⚠ ${fmtDate(t.dueDate)} · ${-dd}일 지남</span>`; stateCls="overdue"; }
+    else if(dd === 0){ dueTag = `<span class="tag due today">오늘${t.dueTime ? " "+t.dueTime : ""} 마감</span>`; stateCls="dtoday"; }
+    else { dueTag = `<span class="tag due future">${fmtDate(t.dueDate)}${t.dueTime ? " "+t.dueTime : ""} · D-${dd}</span>`; }
+  } else if(t.dueDate && t.done){
+    dueTag = `<span class="tag">${fmtDate(t.dueDate)}</span>`;
+  }
+  let doneTag = "";
+  if(t.done && t.doneAt?.toMillis){
+    const left = 7 - Math.floor((Date.now() - t.doneAt.toMillis())/86400000);
+    doneTag = `<span class="tag donewhen">✓ 달성 · ${Math.max(left,0)}일 후 삭제</span>`;
+  }
+  return `
+  <div class="task ${t.done?'is-done':''} ${stateCls}" data-id="${t.id}">
+    <button class="check" aria-label="완료 체크">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="task-body">
+      <div class="task-title">${esc(t.title)}</div>
+      <div class="task-meta">
+        ${t.project ? `<span class="tag">${esc(t.project)}</span>` : ""}
+        ${dueTag}${doneTag}
+      </div>
+    </div>
+    <div class="task-actions">
+      <button class="icon-btn edit" aria-label="수정"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+      <button class="icon-btn del" aria-label="삭제"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+    </div>
+  </div>`;
+}
+
+/* ===== 동작 ===== */
+async function toggleDone(id, el){
+  const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  try{
+    await updateDoc(doc(db,"tasks",id), {
+      done: !t.done,
+      doneAt: !t.done ? serverTimestamp() : null
+    });
+    if(!t.done) toast("달성! 🎉");
+  }catch(e){ toast("저장 실패 — 인터넷 확인"); }
+}
+
+async function removeTask(id, el){
+  if(!confirm("이 할일을 삭제할까요?")) return;
+  el.classList.add("removing");
+  try{ await deleteDoc(doc(db,"tasks",id)); }
+  catch(e){ el.classList.remove("removing"); toast("삭제 실패"); }
+}
+
+/* ===== 시트 ===== */
+const overlay = $("#overlay");
+function openSheet(id=null){
+  editingId = id;
+  $("#sheetTitle").textContent = id ? "할일 수정" : "할일 추가";
+  const wrap = $("#projWrap");
+  wrap.classList.remove("newmode");
+  $("#projToggle").textContent = "＋새 사업";
+
+  if(id){
+    const t = tasks.find(x=>x.id===id);
+    $("#inTitle").value = t.title || "";
+    $("#inDate").value = t.dueDate || "";
+    $("#inTime").value = t.dueTime || "";
+    const sel = $("#inProjSel");
+    if(t.project && ![...sel.options].some(o=>o.value===t.project)){
+      sel.insertAdjacentHTML("beforeend", `<option value="${esc(t.project)}">${esc(t.project)}</option>`);
+    }
+    sel.value = t.project || "";
+  }else{
+    $("#inTitle").value = "";
+    $("#inDate").value = todayStr();
+    $("#inTime").value = "";
+  }
+  overlay.classList.add("show");
+  setTimeout(()=>$("#inTitle").focus(), 250);
+}
+function closeSheet(){ overlay.classList.remove("show"); editingId=null; }
+
+$("#fabBtn").onclick = ()=>openSheet();
+$("#btnCancel").onclick = closeSheet;
+overlay.onclick = e => { if(e.target===overlay) closeSheet(); };
+
+$("#projToggle").onclick = () => {
+  const wrap = $("#projWrap");
+  const isNew = wrap.classList.toggle("newmode");
+  $("#projToggle").textContent = isNew ? "목록에서" : "＋새 사업";
+  if(isNew) $("#inProjNew").focus();
+};
+
+$("#btnSave").onclick = async () => {
+  const title = $("#inTitle").value.trim();
+  if(!title){ toast("할 일을 입력하세요"); $("#inTitle").focus(); return; }
+  const isNew = $("#projWrap").classList.contains("newmode");
+  const project = (isNew ? $("#inProjNew").value : $("#inProjSel").value).trim();
+  const data = {
+    title,
+    project: project || "일반",
+    dueDate: $("#inDate").value || null,
+    dueTime: $("#inTime").value || null,
+  };
+  try{
+    if(editingId){
+      await updateDoc(doc(db,"tasks",editingId), data);
+      toast("수정 완료");
+    }else{
+      await addDoc(COL, { ...data, done:false, doneAt:null, createdAt: serverTimestamp() });
+      toast("추가 완료");
+    }
+    closeSheet();
+  }catch(e){
+    console.error(e);
+    toast("저장 실패 — 인터넷 확인");
+  }
+};
+
+/* Enter로 저장 */
+$("#inTitle").addEventListener("keydown", e=>{ if(e.key==="Enter") $("#btnSave").click(); });
+
+
+/* ===== GitHub Pages / 홈화면 앱 캐시 ===== */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(err => console.warn("SW 등록 실패", err));
+  });
+}
+</script>
+</body>
+</html>
